@@ -1,0 +1,182 @@
+# ToggleMaster — ambiente local completo
+#
+#   docker compose up -d --build                 -> 9 contêineres (5 apps + 4 bancos)
+#   docker compose --profile fila up -d --build  -> + fila SQS local (ElasticMQ)
+#
+# Sem o perfil "fila", o evaluation-service responde normalmente mas não consegue
+# publicar os eventos, e o analytics-service fica sem fila para consumir.
+
+name: togglemaster
+
+x-aws-local: &aws-local
+  AWS_REGION: us-east-1
+  AWS_DEFAULT_REGION: us-east-1
+  # Credenciais fictícias: o DynamoDB Local e o ElasticMQ não validam assinatura
+  AWS_ACCESS_KEY_ID: local
+  AWS_SECRET_ACCESS_KEY: local
+  AWS_DYNAMODB_TABLE: ToggleMasterAnalytics
+
+services:
+  # ---------------------------------------------------------------- bancos --
+  postgres-auth:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: auth
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina no .env}
+      POSTGRES_DB: auth_db
+      SERVICE_API_KEY: ${SERVICE_API_KEY:?defina no .env}
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+      - ./services/auth-service/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./local/postgres-auth/02-seed-service-key.sh:/docker-entrypoint-initdb.d/02-seed-service-key.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U auth -d auth_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-flags:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: togglemaster
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina no .env}
+    volumes:
+      - postgres-flags-data:/var/lib/postgresql/data
+      - ./local/postgres-flags/01-create-databases.sh:/docker-entrypoint-initdb.d/01-create-databases.sh:ro
+      - ./services/flag-service/db/init.sql:/schemas/flag-init.sql:ro
+      - ./services/targeting-service/db/init.sql:/schemas/targeting-init.sql:ro
+    healthcheck:
+      # -h 127.0.0.1 (TCP): durante o init o Postgres só escuta no socket local,
+      # então o check só passa depois que os bancos foram criados
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U togglemaster -d targeting_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  dynamodb:
+    image: amazon/dynamodb-local:2.5.2
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+    ports:
+      - "8000:8000"
+
+  # Contêiner de uso único: cria a tabela e encerra (não conta entre os 9)
+  dynamodb-init:
+    build: ./services/analytics-service
+    image: togglemaster/analytics-service:local
+    entrypoint: ["python", "/scripts/create_table.py"]
+    environment:
+      <<: *aws-local
+      AWS_ENDPOINT_URL_DYNAMODB: http://dynamodb:8000
+    volumes:
+      - ./local/dynamodb/create_table.py:/scripts/create_table.py:ro
+    depends_on:
+      - dynamodb
+    restart: "no"
+
+  # Fila local compatível com a API do SQS (opcional, perfil "fila")
+  sqs:
+    image: softwaremill/elasticmq-native:1.6.11
+    profiles: ["fila"]
+    volumes:
+      - ./local/sqs/elasticmq.conf:/opt/elasticmq.conf:ro
+    ports:
+      - "9324:9324"
+
+  # ----------------------------------------------------------- aplicações --
+  auth-service:
+    build: ./services/auth-service
+    image: togglemaster/auth-service:local
+    environment:
+      PORT: "8001"
+      DATABASE_URL: postgres://auth:${POSTGRES_PASSWORD}@postgres-auth:5432/auth_db?sslmode=disable
+      MASTER_KEY: ${MASTER_KEY:?defina no .env}
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+    restart: unless-stopped
+
+  flag-service:
+    build: ./services/flag-service
+    image: togglemaster/flag-service:local
+    environment:
+      PORT: "8002"
+      DATABASE_URL: postgres://togglemaster:${POSTGRES_PASSWORD}@postgres-flags:5432/flag_db
+      AUTH_SERVICE_URL: http://auth-service:8001
+    ports:
+      - "8002:8002"
+    depends_on:
+      postgres-flags:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    restart: unless-stopped
+
+  targeting-service:
+    build: ./services/targeting-service
+    image: togglemaster/targeting-service:local
+    environment:
+      PORT: "8003"
+      DATABASE_URL: postgres://togglemaster:${POSTGRES_PASSWORD}@postgres-flags:5432/targeting_db
+      AUTH_SERVICE_URL: http://auth-service:8001
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres-flags:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    restart: unless-stopped
+
+  evaluation-service:
+    build: ./services/evaluation-service
+    image: togglemaster/evaluation-service:local
+    environment:
+      <<: *aws-local
+      PORT: "8004"
+      REDIS_URL: redis://redis:6379
+      FLAG_SERVICE_URL: http://flag-service:8002
+      TARGETING_SERVICE_URL: http://targeting-service:8003
+      SERVICE_API_KEY: ${SERVICE_API_KEY:?defina no .env}
+      AWS_SQS_URL: http://sqs:9324/000000000000/togglemaster-events
+      AWS_SQS_ENDPOINT: http://sqs:9324
+    ports:
+      - "8004:8004"
+    depends_on:
+      redis:
+        condition: service_healthy
+      flag-service:
+        condition: service_started
+      targeting-service:
+        condition: service_started
+    restart: unless-stopped
+
+  analytics-service:
+    build: ./services/analytics-service
+    image: togglemaster/analytics-service:local
+    environment:
+      <<: *aws-local
+      PORT: "8005"
+      AWS_SQS_URL: http://sqs:9324/000000000000/togglemaster-events
+      AWS_ENDPOINT_URL_SQS: http://sqs:9324
+      AWS_ENDPOINT_URL_DYNAMODB: http://dynamodb:8000
+    ports:
+      - "8005:8005"
+    depends_on:
+      dynamodb-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  postgres-auth-data:
+  postgres-flags-data:
