@@ -5,6 +5,18 @@ em Kubernetes (AWS EKS).
 
 **Participantes:** Lucas de Togni Souza (RM375772) · Rafael Gamba Ramos (RM373722)
 
+## Arquitetura
+
+![Arquitetura AWS do ToggleMaster - Fase 2](diagrama/togglemaster-fase2-arquitetura.drawio.png)
+
+Fonte editável: [`diagrama/togglemaster-fase2-arquitetura.drawio`](diagrama/togglemaster-fase2-arquitetura.drawio).
+
+| Documento | Conteúdo |
+|---|---|
+| [`docs/01-arquitetura.md`](docs/01-arquitetura.md) | Decisões de arquitetura, papel de cada data store, escalabilidade (HPA x KEDA), limitações do AWS Academy |
+| [`docs/02-estimativa-custos.md`](docs/02-estimativa-custos.md) | Custo por componente e estratégia de uso do crédito |
+| [`docs/03-relatorio-entrega.md`](docs/03-relatorio-entrega.md) | Relatório de entrega |
+
 ## Microsserviços
 
 | Serviço | Linguagem | Porta | Depende de |
@@ -102,6 +114,28 @@ Para remover o cluster local:
 ```bash
 kind delete cluster --name togglemaster-fase2
 ```
+
+## Implantação na AWS
+
+Os recursos são criados com os nomes `togglemaster-fase2-*`, numa VPC própria. Sequência de uma
+sessão do AWS Academy Learner Lab (Git Bash, na raiz do repositório):
+
+| Passo | Como |
+|---|---|
+| Conferir credenciais e o que já existe | `./scripts/aws/00-verificar-sessao.sh` |
+| VPC `togglemaster-fase2-vpc` (2 AZs, 2 subnets públicas + 2 privadas, sem NAT) | Console |
+| Preparar subnets para o EKS | `./scripts/aws/01-preparar-vpc.sh` |
+| Cluster EKS + Managed Node Group com a `LabRole` | Console |
+| ECR + build e push das imagens | `./scripts/aws/02-publicar-imagens-ecr.sh` |
+| RDS (3), ElastiCache, DynamoDB, SQS | Console ou `./scripts/aws/03-provisionar-recursos.sh` |
+| Gerar os Secrets com os endpoints reais | `./scripts/aws/04-gerar-config-k8s.sh` |
+| Metrics Server + Nginx Ingress Controller | `./scripts/aws/05-preparar-cluster.sh` |
+| Deploy dos manifestos | `./scripts/aws/06-deploy.sh` |
+| Destruir tudo | `./scripts/aws/99-destruir.sh` |
+
+Demonstrações em `scripts/aws/demo/`: `smoke-test.sh` (fluxo completo pelo Load Balancer),
+`carga-evaluation.sh` (HPA do evaluation), `enviar-mensagens-sqs.sh` (HPA do analytics),
+`observar-hpa.sh` e `ver-dynamodb.sh`.
 
 ## Imagens
 
