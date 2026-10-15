@@ -6,7 +6,7 @@
 # Sem o perfil "fila", o evaluation-service responde normalmente mas não consegue
 # publicar os eventos, e o analytics-service fica sem fila para consumir.
 
-name: togglemaster
+name: togglemaster-fase2
 
 x-aws-local: &aws-local
   AWS_REGION: us-east-1
@@ -71,7 +71,7 @@ services:
   # Contêiner de uso único: cria a tabela e encerra (não conta entre os 9)
   dynamodb-init:
     build: ./services/analytics-service
-    image: togglemaster/analytics-service:local
+    image: togglemaster-fase2/analytics-service:local
     entrypoint: ["python", "/scripts/create_table.py"]
     environment:
       <<: *aws-local
@@ -94,7 +94,7 @@ services:
   # ----------------------------------------------------------- aplicações --
   auth-service:
     build: ./services/auth-service
-    image: togglemaster/auth-service:local
+    image: togglemaster-fase2/auth-service:local
     environment:
       PORT: "8001"
       DATABASE_URL: postgres://auth:${POSTGRES_PASSWORD}@postgres-auth:5432/auth_db?sslmode=disable
@@ -108,7 +108,7 @@ services:
 
   flag-service:
     build: ./services/flag-service
-    image: togglemaster/flag-service:local
+    image: togglemaster-fase2/flag-service:local
     environment:
       PORT: "8002"
       DATABASE_URL: postgres://togglemaster:${POSTGRES_PASSWORD}@postgres-flags:5432/flag_db
@@ -124,7 +124,7 @@ services:
 
   targeting-service:
     build: ./services/targeting-service
-    image: togglemaster/targeting-service:local
+    image: togglemaster-fase2/targeting-service:local
     environment:
       PORT: "8003"
       DATABASE_URL: postgres://togglemaster:${POSTGRES_PASSWORD}@postgres-flags:5432/targeting_db
@@ -140,7 +140,7 @@ services:
 
   evaluation-service:
     build: ./services/evaluation-service
-    image: togglemaster/evaluation-service:local
+    image: togglemaster-fase2/evaluation-service:local
     environment:
       <<: *aws-local
       PORT: "8004"
@@ -163,7 +163,7 @@ services:
 
   analytics-service:
     build: ./services/analytics-service
-    image: togglemaster/analytics-service:local
+    image: togglemaster-fase2/analytics-service:local
     environment:
       <<: *aws-local
       PORT: "8005"
