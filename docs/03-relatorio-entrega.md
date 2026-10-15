@@ -13,7 +13,7 @@
 
 | Item | Link |
 |---|---|
-| Repositório | `PREENCHER — https://github.com/LucasTogniS/tech-challenge-fase2` |
+| Repositório | https://github.com/LucasTogniS/tech-challenge-fase2 |
 | Vídeo de demonstração | `PREENCHER` |
 | Badge Google Cloud Skills Boost (pontuação extra) | `PREENCHER, se concluído` |
 
