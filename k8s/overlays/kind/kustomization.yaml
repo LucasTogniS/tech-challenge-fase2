@@ -1,0 +1,42 @@
+# Overlay local: imagens construídas na máquina + dependências simulando a AWS.
+# Os arquivos env/*.env são gerados por scripts/kind-up.sh a partir do .env da raiz.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  - deps.yaml
+
+images:
+  - {name: auth-service,       newName: togglemaster-fase2/auth-service,       newTag: local}
+  - {name: flag-service,       newName: togglemaster-fase2/flag-service,       newTag: local}
+  - {name: targeting-service,  newName: togglemaster-fase2/targeting-service,  newTag: local}
+  - {name: evaluation-service, newName: togglemaster-fase2/evaluation-service, newTag: local}
+  - {name: analytics-service,  newName: togglemaster-fase2/analytics-service,  newTag: local}
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+secretGenerator:
+  - {name: auth-service-secret,       namespace: togglemaster-auth,       behavior: replace, envs: [env/auth-service.env]}
+  - {name: flag-service-secret,       namespace: togglemaster-flag,       behavior: replace, envs: [env/flag-service.env]}
+  - {name: targeting-service-secret,  namespace: togglemaster-targeting,  behavior: replace, envs: [env/targeting-service.env]}
+  - {name: evaluation-service-secret, namespace: togglemaster-evaluation, behavior: replace, envs: [env/evaluation-service.env]}
+  - {name: analytics-service-secret,  namespace: togglemaster-analytics,  behavior: replace, envs: [env/analytics-service.env]}
+  - {name: deps-secret,               namespace: togglemaster-deps,                          envs: [env/deps.env]}
+
+configMapGenerator:
+  # Aponta os SDKs da AWS para os emuladores locais
+  - name: evaluation-service-config
+    namespace: togglemaster-evaluation
+    behavior: merge
+    literals:
+      - AWS_SQS_ENDPOINT=http://elasticmq.togglemaster-deps:9324
+  - name: analytics-service-config
+    namespace: togglemaster-analytics
+    behavior: merge
+    literals:
+      - AWS_ENDPOINT_URL_SQS=http://elasticmq.togglemaster-deps:9324
+      - AWS_ENDPOINT_URL_DYNAMODB=http://dynamodb.togglemaster-deps:8000
+  - name: dynamodb-create-table
+    namespace: togglemaster-deps
+    files: [create_table.py]

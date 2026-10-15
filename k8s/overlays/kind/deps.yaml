@@ -1,0 +1,196 @@
+# Substitutos locais dos serviços gerenciados da AWS — só existem no overlay kind.
+#   RDS (x3)     -> 1 PostgreSQL com 3 bancos
+#   ElastiCache  -> Redis
+#   DynamoDB     -> DynamoDB Local
+#   SQS          -> ElasticMQ
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: togglemaster-deps
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: togglemaster-deps
+data:
+  01-databases.sh: |
+    set -eu
+    for db in flag_db targeting_db; do
+      psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE $db"
+    done
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: togglemaster-deps
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: postgres}
+  template:
+    metadata:
+      labels: {app: postgres}
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - {name: POSTGRES_USER, value: togglemaster}
+            - {name: POSTGRES_DB, value: auth_db}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: deps-secret, key: POSTGRES_PASSWORD}
+          ports: [{containerPort: 5432}]
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-h", "127.0.0.1", "-U", "togglemaster", "-d", "targeting_db"]
+            periodSeconds: 5
+          volumeMounts:
+            - {name: init, mountPath: /docker-entrypoint-initdb.d}
+      volumes:
+        - name: init
+          configMap: {name: postgres-init}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: togglemaster-deps
+spec:
+  selector: {app: postgres}
+  ports: [{port: 5432}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: togglemaster-deps
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: redis}
+  template:
+    metadata:
+      labels: {app: redis}
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args: ["--save", "", "--appendonly", "no"]
+          ports: [{containerPort: 6379}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: togglemaster-deps
+spec:
+  selector: {app: redis}
+  ports: [{port: 6379}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dynamodb
+  namespace: togglemaster-deps
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: dynamodb}
+  template:
+    metadata:
+      labels: {app: dynamodb}
+    spec:
+      containers:
+        - name: dynamodb
+          image: amazon/dynamodb-local:2.5.2
+          args: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+          ports: [{containerPort: 8000}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dynamodb
+  namespace: togglemaster-deps
+spec:
+  selector: {app: dynamodb}
+  ports: [{port: 8000}]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticmq-config
+  namespace: togglemaster-deps
+data:
+  elasticmq.conf: |
+    include classpath("application.conf")
+    node-address {
+      protocol = http
+      host = elasticmq.togglemaster-deps
+      port = 9324
+      context-path = ""
+    }
+    queues {
+      togglemaster-fase2-events {}
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elasticmq
+  namespace: togglemaster-deps
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: elasticmq}
+  template:
+    metadata:
+      labels: {app: elasticmq}
+    spec:
+      containers:
+        - name: elasticmq
+          image: softwaremill/elasticmq-native:1.6.11
+          ports: [{containerPort: 9324}]
+          volumeMounts:
+            - {name: config, mountPath: /opt/elasticmq.conf, subPath: elasticmq.conf}
+      volumes:
+        - name: config
+          configMap: {name: elasticmq-config}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticmq
+  namespace: togglemaster-deps
+spec:
+  selector: {app: elasticmq}
+  ports: [{port: 9324}]
+---
+# Cria a tabela no DynamoDB Local (na AWS ela é criada pelo console)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dynamodb-create-table
+  namespace: togglemaster-deps
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-table
+          image: togglemaster-fase2/analytics-service:local
+          command: ["python", "/scripts/create_table.py"]
+          env:
+            - {name: AWS_DYNAMODB_TABLE, value: ToggleMasterAnalytics}
+            - {name: AWS_DEFAULT_REGION, value: us-east-1}
+            - {name: AWS_ACCESS_KEY_ID, value: local}
+            - {name: AWS_SECRET_ACCESS_KEY, value: local}
+            - {name: AWS_ENDPOINT_URL_DYNAMODB, value: "http://dynamodb.togglemaster-deps:8000"}
+          volumeMounts:
+            - {name: script, mountPath: /scripts}
+      volumes:
+        - name: script
+          configMap: {name: dynamodb-create-table}

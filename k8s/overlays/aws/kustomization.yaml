@@ -1,0 +1,25 @@
+# Overlay AWS (EKS): imagens do ECR + endpoints reais (RDS, ElastiCache, SQS).
+# 1. Troque CONTA pelo ID da conta AWS (scripts/aws-deploy.sh faz isso).
+# 2. Copie env/*.env.example para env/*.env e preencha (os .env não vão para o Git).
+# As credenciais da AWS vêm da LabRole dos nós (metadados da instância), não de Secret.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+
+images:
+  - {name: auth-service,       newName: CONTA.dkr.ecr.us-east-1.amazonaws.com/togglemaster-fase2/auth-service,       newTag: v1}
+  - {name: flag-service,       newName: CONTA.dkr.ecr.us-east-1.amazonaws.com/togglemaster-fase2/flag-service,       newTag: v1}
+  - {name: targeting-service,  newName: CONTA.dkr.ecr.us-east-1.amazonaws.com/togglemaster-fase2/targeting-service,  newTag: v1}
+  - {name: evaluation-service, newName: CONTA.dkr.ecr.us-east-1.amazonaws.com/togglemaster-fase2/evaluation-service, newTag: v1}
+  - {name: analytics-service,  newName: CONTA.dkr.ecr.us-east-1.amazonaws.com/togglemaster-fase2/analytics-service,  newTag: v1}
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+secretGenerator:
+  - {name: auth-service-secret,       namespace: togglemaster-auth,       behavior: replace, envs: [env/auth-service.env]}
+  - {name: flag-service-secret,       namespace: togglemaster-flag,       behavior: replace, envs: [env/flag-service.env]}
+  - {name: targeting-service-secret,  namespace: togglemaster-targeting,  behavior: replace, envs: [env/targeting-service.env]}
+  - {name: evaluation-service-secret, namespace: togglemaster-evaluation, behavior: replace, envs: [env/evaluation-service.env]}
+  - {name: analytics-service-secret,  namespace: togglemaster-analytics,  behavior: replace, envs: [env/analytics-service.env]}

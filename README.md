@@ -57,6 +57,52 @@ automaticamente no banco do auth-service na primeira subida. Para criar chaves d
 curl -X POST http://localhost:8001/admin/keys -H "Authorization: Bearer $MASTER_KEY" -H "Content-Type: application/json" -d '{"name":"minha-chave"}'
 ```
 
+## Kubernetes
+
+```
+k8s/
+├── base/                 # manifestos comuns, um diretório (e um namespace) por serviço
+│   └── <serviço>/        # namespace, configmap, secret, deployment, service, ingress
+│                         # + hpa (evaluation, analytics) + job de migração (serviços com PostgreSQL)
+└── overlays/
+    ├── aws/              # imagens do ECR; secrets com endpoints de RDS, ElastiCache e SQS
+    └── kind/             # imagens locais + PostgreSQL, Redis, DynamoDB Local e ElasticMQ no cluster
+```
+
+| Serviço | Namespace | Rota no Ingress | Réplicas |
+|---|---|---|---|
+| auth-service | `togglemaster-auth` | `/auth/*` (prefixo removido) | 2 |
+| flag-service | `togglemaster-flag` | `/flags` | 2 |
+| targeting-service | `togglemaster-targeting` | `/rules` | 2 |
+| evaluation-service | `togglemaster-evaluation` | `/evaluate` | HPA 1–6 (CPU 70%) |
+| analytics-service | `togglemaster-analytics` | `/analytics/*` (prefixo removido) | HPA 1–4 (CPU 70%) |
+
+Todos os Deployments têm requests/limits, readiness e liveness probe em `/health`, e rodam como
+não-root com filesystem e capabilities restritos. O schema dos bancos é aplicado por um **Job**
+separado, e não no boot da aplicação: é a correção do débito do fator XII apontado na Fase 1.
+
+### Teste local com kind
+
+O mesmo conjunto de manifestos roda num cluster local (kind, 1 control-plane + 2 workers) antes
+de ir para o EKS:
+
+```bash
+./scripts/kind-up.sh
+```
+
+```bash
+curl http://localhost:8080/auth/health
+```
+
+Teste de carga (`hey -z 90s -c 50` em `/evaluate`): o HPA do evaluation-service escalou de 1
+para 6 pods, e o do analytics-service de 1 para 4, puxado pelo volume de eventos na fila.
+
+Para remover o cluster local:
+
+```bash
+kind delete cluster --name togglemaster-fase2
+```
+
 ## Imagens
 
 Todas as imagens usam **multi-stage build** e rodam como usuário não-root.
@@ -79,4 +125,5 @@ O código fornecido não compilava/rodava como estava. Ajustes mínimos aplicado
 | evaluation-service | `os` usado sem import; `context` importado sem uso | Imports corrigidos; `go.sum` completado |
 | evaluation-service | SDK v1 da AWS não aceita endpoint alternativo por variável | `AWS_SQS_ENDPOINT` opcional (vazio = SQS da AWS) |
 | serviços Python | Flask 2.2.2 quebra com Werkzeug 3.x; gunicorn 20.1.0 depende de `pkg_resources` | `Werkzeug==2.2.3` fixado; gunicorn 23.0.0 |
+| imagens Go | `USER nonroot` (nome) impede o Kubernetes de validar `runAsNonRoot` | `USER 65532:65532` |
 | analytics-service | boto3 1.26 não lê `AWS_ENDPOINT_URL_*` (necessário para o DynamoDB Local) | boto3 1.34.162 |

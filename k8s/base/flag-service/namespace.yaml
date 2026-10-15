@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: togglemaster-flag
+  labels:
+    app.kubernetes.io/name: flag-service
+    app.kubernetes.io/part-of: togglemaster

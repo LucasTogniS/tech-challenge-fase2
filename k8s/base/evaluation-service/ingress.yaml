@@ -1,0 +1,22 @@
+# Um Ingress por namespace: o Ingress só enxerga Services do próprio namespace.
+# O Nginx Ingress Controller junta todos numa única configuração (mesmo Load Balancer).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: evaluation-service
+  namespace: togglemaster-evaluation
+  labels:
+    app.kubernetes.io/name: evaluation-service
+    app.kubernetes.io/part-of: togglemaster
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /evaluate
+            pathType: Prefix
+            backend:
+              service:
+                name: evaluation-service
+                port:
+                  name: http

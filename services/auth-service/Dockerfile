@@ -18,5 +18,6 @@ FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/auth-service /auth-service
 ENV PORT=8001
 EXPOSE 8001
-USER nonroot:nonroot
+# UID numérico: o Kubernetes só valida runAsNonRoot com UID, não com nome
+USER 65532:65532
 ENTRYPOINT ["/auth-service"]

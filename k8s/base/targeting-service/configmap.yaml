@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: targeting-service-config
+  namespace: togglemaster-targeting
+  labels:
+    app.kubernetes.io/name: targeting-service
+    app.kubernetes.io/part-of: togglemaster
+data:
+  PORT: "8003"
+  AUTH_SERVICE_URL: "http://auth-service.togglemaster-auth.svc.cluster.local:8001"

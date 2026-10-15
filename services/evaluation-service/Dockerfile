@@ -18,5 +18,6 @@ FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/evaluation-service /evaluation-service
 ENV PORT=8004
 EXPOSE 8004
-USER nonroot:nonroot
+# UID numérico: o Kubernetes só valida runAsNonRoot com UID, não com nome
+USER 65532:65532
 ENTRYPOINT ["/evaluation-service"]

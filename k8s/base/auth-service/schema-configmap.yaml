@@ -1,0 +1,26 @@
+# Cópia de services/auth-service/db/init.sql (o kustomize não lê arquivos fora de k8s/)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-service-schema
+  namespace: togglemaster-auth
+  labels:
+    app.kubernetes.io/name: auth-service
+    app.kubernetes.io/part-of: togglemaster
+data:
+  init.sql: |
+    CREATE TABLE IF NOT EXISTS api_keys (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+    
+        -- key_hash armazena o hash SHA-256 da chave, que tem 64 caracteres hexadecimais
+        key_hash VARCHAR(64) NOT NULL UNIQUE, 
+    
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Chave de serviço do evaluation-service (só o hash SHA-256 é gravado)
+    INSERT INTO api_keys (name, key_hash)
+    VALUES ('evaluation-service', encode(sha256(convert_to(:'service_key', 'UTF8')), 'hex'))
+    ON CONFLICT (key_hash) DO NOTHING;

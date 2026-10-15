@@ -1,0 +1,25 @@
+# Um Ingress por namespace: o Ingress só enxerga Services do próprio namespace.
+# O Nginx Ingress Controller junta todos numa única configuração (mesmo Load Balancer).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: analytics-service
+  namespace: togglemaster-analytics
+  labels:
+    app.kubernetes.io/name: analytics-service
+    app.kubernetes.io/part-of: togglemaster
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /analytics(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: analytics-service
+                port:
+                  name: http
