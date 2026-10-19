@@ -6,8 +6,8 @@
 
 | Nome | RM | Discord |
 |---|---|---|
-| Lucas de Togni Souza | RM375772 | `PREENCHER` |
-| Rafael Gamba Ramos | RM373722 | `PREENCHER` |
+| Lucas de Togni Souza | RM375772 | `_lucassx_` |
+| Rafael Gamba Ramos | RM373722 | `rafa_217616` |
 
 ## Links
 
