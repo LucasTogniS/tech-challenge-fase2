@@ -113,3 +113,19 @@ confirmar() {
   read -r -p "    $1 [s/N] " resp
   [ "$resp" = s ] || [ "$resp" = S ]
 }
+
+# Os nós do node group nascem com IMDSv2 e hop limit 1: só o próprio nó alcança o serviço de
+# metadados. Os pods ficam um salto depois e não recebem as credenciais da LabRole
+# ("NoCredentialProviders" / "Unable to locate credentials"). Sobe o limite para 2 em cada nó.
+liberar_imds_para_pods() {
+  local ids id
+  ids=$(aws_ ec2 describe-instances \
+    --filters "Name=tag:eks:nodegroup-name,Values=$NODEGROUP" Name=instance-state-name,Values=pending,running \
+    --query 'Reservations[].Instances[].InstanceId' --output text)
+  [ -n "$ids" ] || { aviso "Nenhum nó em execução no node group $NODEGROUP"; return 0; }
+  for id in $ids; do
+    aws_ ec2 modify-instance-metadata-options --instance-id "$id" \
+      --http-tokens required --http-endpoint enabled --http-put-response-hop-limit 2 >/dev/null
+    ok "$id: hop limit 2 (pods recebem as credenciais da LabRole)"
+  done
+}

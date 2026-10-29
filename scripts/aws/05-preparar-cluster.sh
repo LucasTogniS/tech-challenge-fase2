@@ -11,6 +11,9 @@ kubectl get nodes -o wide
 NODES_READY=$(kubectl get nodes --no-headers 2>/dev/null | grep -c " Ready" || true)
 [ "$NODES_READY" -ge 1 ] || falha "Nenhum nó Ready. O Managed Node Group foi criado (guia, passo 4)?"
 
+log "Metadados da instância acessíveis aos pods (credenciais da LabRole)"
+liberar_imds_para_pods
+
 log "Metrics Server $METRICS_SERVER_VERSION"
 kubectl apply -f "https://github.com/kubernetes-sigs/metrics-server/releases/download/$METRICS_SERVER_VERSION/components.yaml"
 kubectl -n kube-system rollout status deployment/metrics-server --timeout=180s
