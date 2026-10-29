@@ -131,6 +131,7 @@ sessão do AWS Academy Learner Lab (Git Bash, na raiz do repositório):
 | Gerar os Secrets com os endpoints reais | `./scripts/aws/04-gerar-config-k8s.sh` |
 | Metrics Server + Nginx Ingress Controller | `./scripts/aws/05-preparar-cluster.sh` |
 | Deploy dos manifestos | `./scripts/aws/06-deploy.sh` |
+| Desligar/religar os nós entre sessões | `./scripts/aws/nodes.sh desligar` · `./scripts/aws/nodes.sh ligar` |
 | Destruir tudo | `./scripts/aws/99-destruir.sh` |
 
 Demonstrações em `scripts/aws/demo/`: `smoke-test.sh` (fluxo completo pelo Load Balancer),

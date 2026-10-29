@@ -117,6 +117,7 @@ evaluation-service de 1 a 6 réplicas, e o volume de eventos gerado levou o anal
 |---|---|---|
 | Não é possível criar IAM Roles | Sem `eksctl create cluster`, sem IRSA/Pod Identity, sem KEDA, sem Karpenter, sem AWS Load Balancer Controller | Cluster e node group criados pelo console com a `LabRole`; HPA por CPU; Load Balancer criado pelo controlador nativo do Kubernetes (NLB) |
 | Todos os pods herdam a `LabRole` do nó | Não há privilégio mínimo por serviço — qualquer pod pode acessar SQS e DynamoDB | Aceito no laboratório. Em produção: uma role por ServiceAccount (IRSA) |
+| Nós criados com IMDSv2 e *hop limit* 1 | Só o próprio nó alcança o serviço de metadados; os pods ficavam sem as credenciais da `LabRole` (`NoCredentialProviders` no evaluation, `Unable to locate credentials` no analytics) e nenhum evento chegava ao SQS | `05-preparar-cluster.sh` e `nodes.sh ligar` sobem o *hop limit* para 2 em cada nó. Em produção, IRSA/Pod Identity dispensa o acesso dos pods aos metadados |
 | Credenciais temporárias (~4 h) | Scripts e `kubectl` param de funcionar ao fim da sessão | Credenciais renovadas no `~/.aws/credentials` a cada sessão; os pods não dependem delas |
 | Sem Cluster Autoscaler | O node group não cresce sozinho se faltar CPU para novos pods | Node group com 2 nós dimensionado para o pico do HPA (≈ 2 vCPU de requests no máximo) |
 | Crédito de US$ 50 para o curso todo | O ambiente completo custa ≈ US$ 7,50 por dia ligado | Tudo validado localmente antes; infraestrutura criada, demonstrada e destruída no mesmo dia, por script |
