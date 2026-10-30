@@ -17,6 +17,20 @@
 | Vídeo de demonstração | `PREENCHER` |
 | Badge Google Cloud Skills Boost (pontuação extra) | `PREENCHER, se concluído` |
 
+## Roteiro do vídeo (14:57)
+
+| Início | Bloco | Narração |
+|---|---|---|
+| 0:00 | Abertura | Lucas |
+| 0:41 | Arquitetura (diagrama) | Rafael |
+| 2:42 | Ambiente local com Docker Compose (9 contêineres) | Lucas |
+| 4:15 | Infraestrutura na AWS (EKS, node group, ECR, RDS, ElastiCache, DynamoDB, SQS) | Rafael |
+| 6:20 | Pods, Ingress e teste pelo Load Balancer | Lucas |
+| 8:13 | Escalabilidade: HPA do evaluation-service sob carga | Rafael |
+| 10:09 | Fila SQS, HPA do analytics-service e dados no DynamoDB | Lucas |
+| 11:51 | Por que cada escolha (RDS x ElastiCache x DynamoDB; HPA x KEDA) | Rafael |
+| 13:33 | Desafios e encerramento | Lucas |
+
 ## O que foi entregue
 
 | Requisito | Onde está |
