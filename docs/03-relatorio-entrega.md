@@ -360,21 +360,7 @@ O plano de controle do EKS é o maior item (≈ 32%) e não depende de carga. Fi
 
 ---
 
-## 11. Próximos passos (Fase 3)
-
-1. **Infraestrutura como código** (Terraform) no lugar do provisionamento pelo console e por scripts.
-2. **Pipeline CI/CD**: build, testes, varredura de vulnerabilidades e publicação das imagens no ECR
-   com tag por commit, e deploy automático no cluster.
-3. **Nós em subnets privadas** com NAT Gateway ou VPC Endpoints para ECR, S3, SQS e DynamoDB.
-4. **Segredos no AWS Secrets Manager**, sincronizados com o External Secrets Operator.
-5. Numa conta com IAM completo: **IRSA** por serviço e **KEDA** escalando o analytics-service pela fila.
-6. **Observabilidade**: Prometheus e Grafana para métricas, logs centralizados e alertas.
-7. **Resiliência**: RDS Multi-AZ, PodDisruptionBudgets e Cluster Autoscaler (ou Karpenter) para o
-   node group crescer junto com o HPA.
-
----
-
-## 12. Referências
+## 11. Referências
 
 - [Código-fonte dos microsserviços — FIAP-TCs](https://github.com/FIAP-TCs)
 - [Amazon EKS — Managed Node Groups](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)
